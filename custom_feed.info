@@ -1,0 +1,4 @@
+name = Custom feed
+core = 7.x
+description = Provides a custom XML feed.
+package = Custom
