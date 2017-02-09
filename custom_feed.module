@@ -1,0 +1,93 @@
+<?php
+
+/**
+ * Implements hook_menu().
+ */
+function custom_feed_menu() {
+
+  $items = [];
+
+  $items['custom.xml'] = [
+    'page callback'   => '_custom_feed_page_callback',
+    'access callback' => TRUE,
+    'type'            => MENU_CALLBACK,
+  ];
+
+  return $items;
+}
+
+/**
+ * Return feed for indicated content.
+ */
+function _custom_feed_page_callback() {
+
+  $nids = db_select('node', 'n');
+  $nids->fields('n', ['nid', 'created']);
+  $nids->condition('n.status', 1);
+  $nids->orderBy('n.created', 'DESC');
+  $nids->range(0, 10);
+  $nids = $nids->execute()->fetchCol();
+
+  _custom_xml_node_feed($nids);
+}
+
+/**
+ * Generates and prints a custom XML feed.
+ */
+function _custom_xml_node_feed($nids) {
+
+  global $base_url;
+
+  $nodes = node_load_multiple($nids);
+  $items = '';
+  foreach ($nodes as $node) {
+
+    $node->link = url("node/$node->nid", ['absolute' => TRUE]);
+
+    $items .= _custom_xml_format_rss_item($node->title, $node->link);
+  }
+
+  $channel_defaults = array(
+    'title' => variable_get('site_name', 'Drupal'),
+    'link' => $base_url,
+  );
+
+  $output = "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"no\" ?>\n";
+  $output .= "<!DOCTYPE CUSTOM.EVENTS SYSTEM \"custom_import.dtd\">\n";
+  $output .= "<CUSTOM.EVENTS version=\"2.25\">\n";
+  $output .= _custom_xml_format_rss_channel($channel_defaults['title'], $channel_defaults['link'], $items);
+
+  drupal_add_http_header('Content-Type', 'application/rss+xml; charset=utf-8');
+  print $output;
+}
+
+/**
+ * Formats an XML channel.
+ */
+function _custom_xml_format_rss_channel($title, $link, $items) {
+
+  $output = "  <EVENTLIST>\n";
+  $output .= "    <SOURCE id=\"12345\">\n";
+  $output .= '      <TITLE>' . check_plain($title) . "</TITLE>\n";
+  $output .= '      <LINK>' . check_url($link) . "</LINK>\n";
+  $output .= "    </SOURCE>\n\n";
+
+  $output .= $items;
+  $output .= "  </EVENTLIST>\n";
+  $output .= "</CUSTOM.EVENTS>\n";
+
+  return $output;
+}
+
+/**
+ * Formats a single XML item.
+ */
+function _custom_xml_format_rss_item($title, $link) {
+
+  $output = "    <EVENT>\n";
+  $output .= '      <TITLE>' . check_plain($title) . "</TITLE>\n";
+  $output .= '      <LINK>' . check_url($link) . "</LINK>\n";
+  $output .= "    </EVENT>\n\n";
+
+  return $output;
+}
